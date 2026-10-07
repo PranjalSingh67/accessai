@@ -19,6 +19,7 @@ class TestHealth:
         data = response.json()
         assert data['status'] == 'ok'
         assert 'service' in data
+        assert 'version' in data
 
     def test_api_info(self):
         """Test API info endpoint."""
@@ -27,6 +28,7 @@ class TestHealth:
         data = response.json()
         assert 'name' in data
         assert 'endpoints' in data
+        assert 'version' in data
 
 
 class TestTextAnalysis:
@@ -44,6 +46,8 @@ class TestTextAnalysis:
         assert 'simplified_explanation' in data
         assert 'important_information' in data
         assert 'actions' in data
+        assert isinstance(data['important_information'], list)
+        assert isinstance(data['actions'], list)
 
     def test_analyze_text_very_simple(self):
         """Test very simple mode."""
@@ -65,12 +69,21 @@ class TestTextAnalysis:
         assert response.status_code == 200
         data = response.json()
         assert 'actions' in data
+        assert len(data['actions']) > 0
 
     def test_analyze_text_empty(self):
         """Test empty text validation."""
         response = client.post(
             '/api/v1/text/analyze',
             json={'text': '', 'mode': 'simple'}
+        )
+        assert response.status_code == 400
+
+    def test_analyze_text_whitespace_only(self):
+        """Test whitespace-only text."""
+        response = client.post(
+            '/api/v1/text/analyze',
+            json={'text': '   \n\t  ', 'mode': 'simple'}
         )
         assert response.status_code == 400
 
@@ -89,6 +102,10 @@ class TestTextAnalysis:
         data = response.json()
         assert 'modes' in data
         assert len(data['modes']) == 3
+        mode_keys = [m['key'] for m in data['modes']]
+        assert 'simple' in mode_keys
+        assert 'very_simple' in mode_keys
+        assert 'step_by_step' in mode_keys
 
 
 class TestDigitalService:
@@ -106,6 +123,8 @@ class TestDigitalService:
         assert 'required_documents' in data
         assert 'deadlines' in data
         assert 'service_type' in data
+        assert isinstance(data['required_documents'], list)
+        assert isinstance(data['deadlines'], list)
 
     def test_analyze_digital_service_empty(self):
         """Test empty digital service content."""
@@ -122,6 +141,7 @@ class TestDigitalService:
         data = response.json()
         assert 'examples' in data
         assert len(data['examples']) > 0
+        assert isinstance(data['examples'], list)
 
 
 class TestImageAnalysis:
@@ -137,6 +157,17 @@ class TestImageAnalysis:
         data = response.json()
         assert 'summary' in data
         assert 'accessible_version' in data
+        assert 'important_information' in data
+
+    def test_analyze_image_default_prompt(self):
+        """Test image analysis with default prompt."""
+        response = client.post(
+            '/api/v1/image/analyze',
+            json={}
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert 'summary' in data
 
     def test_analyze_image_empty(self):
         """Test empty image prompt."""
@@ -153,6 +184,7 @@ class TestImageAnalysis:
         data = response.json()
         assert 'formats' in data
         assert 'max_size_mb' in data
+        assert len(data['formats']) > 0
 
 
 class TestAudioAnalysis:
@@ -168,6 +200,7 @@ class TestAudioAnalysis:
         data = response.json()
         assert 'summary' in data
         assert 'actions' in data
+        assert isinstance(data['actions'], list)
 
     def test_analyze_audio_empty(self):
         """Test empty audio transcript."""
@@ -184,6 +217,7 @@ class TestAudioAnalysis:
         data = response.json()
         assert 'formats' in data
         assert 'max_size_mb' in data
+        assert len(data['formats']) > 0
 
 
 class TestAIProvider:
@@ -195,6 +229,7 @@ class TestAIProvider:
         result = provider.analyze_text('Sample text')
         assert 'summary' in result
         assert 'simplified_explanation' in result
+        assert 'accessible_version' in result
 
     def test_demo_provider_empty_text(self):
         """Test demo provider with empty text."""
@@ -208,6 +243,7 @@ class TestAIProvider:
         result = provider.analyze_digital_service('Service content')
         assert 'required_documents' in result
         assert 'deadlines' in result
+        assert 'service_type' in result
 
     def test_demo_provider_image(self):
         """Test demo provider image analysis."""
@@ -215,6 +251,7 @@ class TestAIProvider:
         result = provider.analyze_image_description('Image description', '')
         assert 'summary' in result
         assert 'accessible_version' in result
+        assert 'important_information' in result
 
     def test_demo_provider_audio(self):
         """Test demo provider audio analysis."""
@@ -222,3 +259,30 @@ class TestAIProvider:
         result = provider.analyze_audio_transcript('Transcript text')
         assert 'summary' in result
         assert 'actions' in result
+
+
+class TestResponseStructure:
+    """Test response data structure integrity."""
+
+    def test_response_has_all_fields(self):
+        """Test that responses have all required fields."""
+        response = client.post(
+            '/api/v1/text/analyze',
+            json={'text': 'Sample text'}
+        )
+        data = response.json()
+        required_fields = ['summary', 'simplified_explanation', 'important_information', 
+                          'actions', 'warnings', 'accessible_version', 'key_points']
+        for field in required_fields:
+            assert field in data, f'Missing field: {field}'
+
+    def test_digital_service_has_extended_fields(self):
+        """Test that digital service responses have extended fields."""
+        response = client.post(
+            '/api/v1/digital-service/analyze',
+            json={'content': 'Sample service content'}
+        )
+        data = response.json()
+        assert 'required_documents' in data
+        assert 'deadlines' in data
+        assert 'service_type' in data
