@@ -3,7 +3,12 @@ import os
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-load_dotenv(BASE_DIR.parent / '.env')
+env_file = BASE_DIR.parent / '.env'
+
+if env_file.exists():
+    load_dotenv(env_file)
+else:
+    load_dotenv(BASE_DIR.parent / '.env.example')
 
 APP_NAME = os.getenv('APP_NAME', 'AccessAI')
 APP_ENV = os.getenv('APP_ENV', 'development')
